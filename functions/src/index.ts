@@ -6,7 +6,7 @@ const db = admin.firestore();
 
 const QUEUE_TTL_SECONDS = 60;
 
-export const onQueueJoin = onDocumentWritten(
+export const onQueueUpdated = onDocumentWritten(
   "match_queue/{userId}",
   async (event) => {
     const snap = event.data?.after;
