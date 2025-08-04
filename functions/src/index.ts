@@ -45,7 +45,7 @@ export const onQueueUpdated = onDocumentWritten(
             .collection("match_queue")
             .where("joined_at", ">", cutoff)
             .orderBy("joined_at")
-            .limit(10) // Get more candidates to find available ones
+            .limit(2)
         );
 
         const availablePartner = candidatesSnap.docs.find(
@@ -73,8 +73,17 @@ export const onQueueUpdated = onDocumentWritten(
         tx.set(db.collection("matches").doc(matchId), {
           players: [userId, availablePartner.id],
           start_at: startAt,
-          puzzle_id: "cls:" + Math.floor(Math.random() * 200) + 1,
+          puzzle_id: "cls:" + (Math.floor(Math.random() * 261) + 20),
           created_at: now,
+          max_duration: 75, // 75 seconds
+          player_states: {
+            [userId]: {
+              username: snap.data()?.username,
+            },
+            [availablePartner.id]: {
+              username: partnerQueueDoc.data()?.username,
+            },
+          },
         });
 
         tx.delete(snap.ref);
