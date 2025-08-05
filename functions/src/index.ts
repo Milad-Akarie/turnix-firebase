@@ -5,8 +5,8 @@ if (!admin.apps.length) {
 }
 
 // Import functions from separate modules
-import { completeMatch } from "./complete_match";
+import { onMatchDeleted } from "./complete_match";
 import { onQueueUpdated } from "./match_making";
 
 // Export all functions
-export { completeMatch, onQueueUpdated };
+export { onMatchDeleted, onQueueUpdated };

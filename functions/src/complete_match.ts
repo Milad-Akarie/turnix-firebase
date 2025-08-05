@@ -1,52 +1,37 @@
 import * as admin from "firebase-admin";
-import { onCall } from "firebase-functions/v2/https";
+import { onDocumentDeleted } from "firebase-functions/v2/firestore";
 
 const db = admin.firestore();
 
-export const completeMatch = onCall({ cors: true }, async (request) => {
-  const { matchId } = request.data;
+export const onMatchDeleted = onDocumentDeleted(
+  "matches/{matchId}",
+  async (event) => {
+    const matchId = event.params.matchId;
+    const matchData = event.data?.data();
 
-  if (!matchId) {
-    throw new Error("matchId is required");
-  }
+    if (!matchData) {
+      console.log(`No data found for deleted match ${matchId}`);
+      return;
+    }
 
-  if (!request.auth?.uid) {
-    throw new Error("unauthenticated");
-  }
+    console.log(`Processing deleted match: ${matchId}`);
 
-  console.log(`Completing match: ${matchId}`);
-
-  try {
-    await db.runTransaction(async (tx) => {
-      // Get the match document
-      const matchRef = db.collection("matches").doc(matchId);
-      const matchDoc = await tx.get(matchRef);
-
-      if (!matchDoc.exists) {
-        console.log(`Match ${matchId} already resolved`);
-        return { success: true };
-      }
-
-      const matchData = matchDoc.data();
-      if (!matchData) {
-        console.log(`Match ${matchId} has no data`);
-        return { success: false, error: "Match data not found" };
-      }
-
+    try {
+      // Extract match data from the deleted document
       // eslint-disable-next-line camelcase
       const { players, player_states, created_at, start_at, puzzle_id } =
         matchData;
       let { winner } = matchData;
 
-      // Check if match is already resolved
-      if (winner) {
-        console.log(`Match ${matchId} already resolved with winner: ${winner}`);
-        return { success: true, winner, matchId };
+      // Check if match history entries should be created
+      if (!players || !Array.isArray(players) || players.length === 0) {
+        console.log(`No players found in deleted match ${matchId}`);
+        return;
       }
 
-      // Check if winner is already decided
+      // Determine winner if not already decided
       if (!winner) {
-        console.log(`Determining winner for match ${matchId}`);
+        console.log(`Determining winner for deleted match ${matchId}`);
 
         // Determine winner based on finishedAt timestamp, then progress
         let winnerPlayerId = null;
@@ -110,13 +95,6 @@ export const completeMatch = onCall({ cors: true }, async (request) => {
         winner = winnerPlayerId;
         const isDraw = winner === null;
 
-        // Update match with winner
-        tx.update(matchRef, {
-          winner,
-          isDraw,
-          completed_at: admin.firestore.Timestamp.now(),
-        });
-
         console.log(
           `Winner determined: ${winner || "draw"}${
             isDraw
@@ -132,6 +110,8 @@ export const completeMatch = onCall({ cors: true }, async (request) => {
 
       // Create match history entries for each player
       const completedAt = admin.firestore.Timestamp.now();
+
+      const batch = db.batch();
 
       for (const playerId of players) {
         // eslint-disable-next-line camelcase
@@ -186,25 +166,15 @@ export const completeMatch = onCall({ cors: true }, async (request) => {
 
         // Add to match_history collection
         const historyRef = db.collection("match_history").doc();
-        tx.set(historyRef, historyEntry);
+        batch.set(historyRef, historyEntry);
       }
 
-      console.log(`Match history entries created for match ${matchId}`);
-      return { success: true, winner, matchId };
-    });
+      // Commit all history entries
+      await batch.commit();
 
-    // Delete the match document after successful completion
-    // This allows clients to receive the winner update before deletion
-    // await db.collection("matches").doc(matchId).delete();
-    // console.log(`Match document ${matchId} deleted`);
-
-    return { success: true, matchId };
-  } catch (error) {
-    console.error(`Failed to complete match ${matchId}:`, error);
-    throw new Error(
-      `Failed to complete match: ${
-        error instanceof Error ? error.message : String(error)
-      }`
-    );
+      console.log(`Match history entries created for deleted match ${matchId}`);
+    } catch (error) {
+      console.error(`Failed to process deleted match ${matchId}:`, error);
+    }
   }
-});
+);
