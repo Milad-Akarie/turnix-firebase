@@ -1,4 +1,5 @@
 import * as admin from "firebase-admin";
+import { onCall } from "firebase-functions/v2/https";
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -10,3 +11,9 @@ import { onQueueUpdated } from "./match_making";
 
 // Export all functions
 export { onMatchDeleted, onQueueUpdated };
+
+export const getServerTime = onCall(async () => {
+  return {
+    timestamp: admin.firestore.Timestamp.now().toMillis(),
+  };
+});
