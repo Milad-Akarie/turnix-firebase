@@ -29,6 +29,22 @@ export const onMatchDeleted = onDocumentDeleted(
         return;
       }
 
+      // Check if any player quit before match started - if so, clean up and exit without creating history
+      for (const playerId of players) {
+        // eslint-disable-next-line camelcase
+        const playerState = player_states[playerId];
+        if (
+          playerState?.quit_at &&
+          start_at &&
+          playerState.quit_at.toMillis() < start_at.toMillis()
+        ) {
+          console.log(
+            `Player ${playerId} quit before match started, cleaning up without creating match history`
+          );
+          return;
+        }
+      }
+
       // Determine winner if not already decided
       if (!winner) {
         console.log(`Determining winner for deleted match ${matchId}`);
@@ -53,43 +69,67 @@ export const onMatchDeleted = onDocumentDeleted(
             playerId,
             finishedAt: playerState?.finished_at || null,
             progress: playerState?.progress || 0,
+            quitAt: playerState?.quit_at || null,
           });
         }
 
-        // Sort by completion: finished players first (by finishedAt), then by progress
-        playerResults.sort((a, b) => {
-          // If both players finished, compare finishedAt timestamps
-          if (a.finishedAt && b.finishedAt) {
-            return a.finishedAt.toMillis() - b.finishedAt.toMillis();
-          }
-          // If only one player finished, they win
-          if (a.finishedAt && !b.finishedAt) return -1;
-          if (!a.finishedAt && b.finishedAt) return 1;
+        // Check for quit players first - quit player loses by default
+        const quitPlayerIds = playerResults
+          .filter((p) => p.quitAt !== null)
+          .map((p) => p.playerId);
 
-          // If neither finished, compare progress
-          return b.progress - a.progress;
-        });
-
-        // Determine winner or draw
-        const firstPlayer = playerResults[0];
-        const secondPlayer = playerResults[1];
-
-        if (firstPlayer.finishedAt && !secondPlayer.finishedAt) {
-          // First player finished, second didn't
-          winnerPlayerId = firstPlayer.playerId;
-        } else if (!firstPlayer.finishedAt && !secondPlayer.finishedAt) {
-          // Neither finished, compare progress
-          if (firstPlayer.progress > secondPlayer.progress) {
-            winnerPlayerId = firstPlayer.playerId;
-          } else if (firstPlayer.progress === secondPlayer.progress) {
-            // It's a draw - no winner
-            winnerPlayerId = null;
+        if (quitPlayerIds.length > 0) {
+          if (quitPlayerIds.length === 1) {
+            // One player quit, the other wins
+            winnerPlayerId =
+              playerResults.find((p) => !quitPlayerIds.includes(p.playerId))
+                ?.playerId || null;
+            console.log(
+              `Player ${quitPlayerIds[0]} quit, ${winnerPlayerId} wins by default`
+            );
           } else {
-            winnerPlayerId = secondPlayer.playerId;
+            // Both players quit - it's a draw
+            winnerPlayerId = null;
+            console.log(`Both players quit, match is a draw`);
           }
-        } else if (firstPlayer.finishedAt && secondPlayer.finishedAt) {
-          // Both finished, winner is who finished first
-          winnerPlayerId = firstPlayer.playerId;
+        } else {
+          // No one quit, use normal logic
+
+          // Sort by completion: finished players first (by finishedAt), then by progress
+          playerResults.sort((a, b) => {
+            // If both players finished, compare finishedAt timestamps
+            if (a.finishedAt && b.finishedAt) {
+              return a.finishedAt.toMillis() - b.finishedAt.toMillis();
+            }
+            // If only one player finished, they win
+            if (a.finishedAt && !b.finishedAt) return -1;
+            if (!a.finishedAt && b.finishedAt) return 1;
+
+            // If neither finished, compare progress
+            return b.progress - a.progress;
+          });
+
+          // Determine winner or draw
+          const firstPlayer = playerResults[0];
+          const secondPlayer = playerResults[1];
+
+          if (firstPlayer.finishedAt && !secondPlayer.finishedAt) {
+            // First player finished, second didn't
+            winnerPlayerId = firstPlayer.playerId;
+          } else if (!firstPlayer.finishedAt && !secondPlayer.finishedAt) {
+            // Neither finished, compare progress
+            if (firstPlayer.progress > secondPlayer.progress) {
+              winnerPlayerId = firstPlayer.playerId;
+            } else if (firstPlayer.progress === secondPlayer.progress) {
+              // It's a draw - no winner
+              winnerPlayerId = null;
+            } else {
+              winnerPlayerId = secondPlayer.playerId;
+            }
+          } else if (firstPlayer.finishedAt && secondPlayer.finishedAt) {
+            // Both finished, winner is who finished first
+            winnerPlayerId = firstPlayer.playerId;
+          }
         }
 
         winner = winnerPlayerId;
@@ -100,10 +140,14 @@ export const onMatchDeleted = onDocumentDeleted(
             isDraw
               ? " (draw)"
               : ` (finished at: ${
-                  firstPlayer.finishedAt
-                    ? firstPlayer.finishedAt.toDate()
+                  playerResults.find((p) => p.playerId === winner)?.finishedAt
+                    ? playerResults
+                        .find((p) => p.playerId === winner)
+                        ?.finishedAt?.toDate()
                     : "not finished"
-                }, progress: ${firstPlayer.progress})`
+                }, progress: ${
+                  playerResults.find((p) => p.playerId === winner)?.progress
+                })`
           }`
         );
       }
