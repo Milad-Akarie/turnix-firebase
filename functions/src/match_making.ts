@@ -74,13 +74,15 @@ export const onQueueUpdated = onDocumentWritten(
           start_at: startAt,
           puzzle_id: "cls:" + (Math.floor(Math.random() * 261) + 20),
           created_at: now,
-          max_duration: 75, // 75 seconds
+          max_duration: 95, // 95 seconds
           player_states: {
             [userId]: {
               username: snap.data()?.username,
+              avatar: snap.data()?.avatar,
             },
             [availablePartner.id]: {
               username: partnerQueueDoc.data()?.username,
+              avatar: partnerQueueDoc.data()?.avatar,
             },
           },
         });
