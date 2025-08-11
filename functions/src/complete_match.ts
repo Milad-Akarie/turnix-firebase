@@ -195,6 +195,7 @@ export const onMatchDeleted = onDocumentDeleted(
           player_id: playerId,
           opponent_id: opponentId,
           opponent_username: opponentState?.username,
+          opponent_avatar: opponentState?.avatar,
           // eslint-disable-next-line camelcase
           puzzle_id,
           result: isDraw ? "draw" : isWinner ? "win" : "loss",

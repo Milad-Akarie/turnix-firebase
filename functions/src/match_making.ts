@@ -3,7 +3,18 @@ import { onDocumentWritten } from "firebase-functions/v2/firestore";
 
 const db = admin.firestore();
 
-const QUEUE_TTL_SECONDS = 60;
+const QUEUE_TTL_SECONDS = 45;
+const EXCLUDED_LEVELS_LIST = ["cls:37", "cls:51"]; // Add levels to exclude from random selection
+
+// Function to generate a random puzzle ID excluding specified levels
+function generateRandomPuzzleId(): string {
+  let puzzleId: string;
+  do {
+    const randomNum = Math.floor(Math.random() * 283) + 20;
+    puzzleId = "cls:" + randomNum;
+  } while (EXCLUDED_LEVELS_LIST.includes(puzzleId));
+  return puzzleId;
+}
 
 export const onQueueUpdated = onDocumentWritten(
   "match_queue/{userId}",
@@ -72,9 +83,9 @@ export const onQueueUpdated = onDocumentWritten(
         tx.set(db.collection("matches").doc(matchId), {
           players: [userId, availablePartner.id],
           start_at: startAt,
-          puzzle_id: "cls:" + (Math.floor(Math.random() * 261) + 20),
+          puzzle_id: generateRandomPuzzleId(),
           created_at: now,
-          max_duration: 95, // 95 seconds
+          max_duration: 85, // seconds
           player_states: {
             [userId]: {
               username: snap.data()?.username,
