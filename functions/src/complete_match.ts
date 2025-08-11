@@ -153,7 +153,30 @@ export const onMatchDeleted = onDocumentDeleted(
       }
 
       // Create match history entries for each player
-      const completedAt = admin.firestore.Timestamp.now();
+      // Determine completedAt: take the earliest finished_at of any player; if none, use now
+      let completedAt: admin.firestore.Timestamp;
+      try {
+        let earliestFinished: admin.firestore.Timestamp | null = null;
+        for (const playerId of players) {
+          // eslint-disable-next-line camelcase
+          const ts = player_states?.[playerId]?.finished_at || null;
+          if (ts) {
+            if (
+              !earliestFinished ||
+              ts.toMillis() < earliestFinished.toMillis()
+            ) {
+              earliestFinished = ts;
+            }
+          }
+        }
+        completedAt = earliestFinished ?? admin.firestore.Timestamp.now();
+      } catch (e) {
+        console.warn(
+          "Failed to derive completedAt from finished_at; using now()",
+          e
+        );
+        completedAt = admin.firestore.Timestamp.now();
+      }
 
       const batch = db.batch();
 
