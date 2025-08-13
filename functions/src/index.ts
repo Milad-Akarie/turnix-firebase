@@ -8,9 +8,10 @@ if (!admin.apps.length) {
 // Import functions from separate modules
 import { onMatchDeleted } from "./complete_match";
 import { onQueueUpdated } from "./match_making";
+import { notifyPushoverOnQueueJoin } from "./notify_pushover";
 
 // Export all functions
-export { onMatchDeleted, onQueueUpdated };
+export { onMatchDeleted, onQueueUpdated, notifyPushoverOnQueueJoin };
 
 export const getServerTime = onCall(async () => {
   return {
