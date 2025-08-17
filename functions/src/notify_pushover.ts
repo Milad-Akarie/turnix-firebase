@@ -70,11 +70,16 @@ export const notifyUsersOnQueueJoin = onDocumentCreated(
           ttl: 45 * 1000, // 45 seconds
         },
         apns: {
+          headers: {
+            "apns-priority": "10", // Immediate delivery
+            "apns-push-type": "alert",
+          },
           payload: {
             aps: {
               badge: 1,
               sound: "default",
               contentAvailable: true,
+              "interruption-level": "time-sensitive",
             },
           },
         },
